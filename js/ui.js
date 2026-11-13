@@ -84,6 +84,105 @@ window.SS = window.SS || {};
     UI.setMuted(muted);
   };
 
+  /* ---------------- background music ---------------- */
+  // 程序化合成禅意环境乐：低音垫 + 偶发五声音阶钟声，无需任何音频素材文件
+  var bgmOn = true;
+  var bgmNodes = null;
+  var bgmTimer = null;
+
+  function bgmStart() {
+    if (!bgmOn || bgmNodes) return;
+    ensureAudio();
+    if (!actx) return;
+
+    var master = actx.createGain();
+    master.gain.setValueAtTime(0.0001, actx.currentTime);
+    master.gain.exponentialRampToValueAtTime(0.12, actx.currentTime + 4);
+    master.connect(actx.destination);
+
+    // 持续低音垫（轻微失谐 + 缓慢呼吸）
+    var droneGain = actx.createGain();
+    droneGain.gain.value = 0.5;
+    droneGain.connect(master);
+
+    var droneFreqs = [110, 110.4, 164.81]; // A2 + 微失谐 + E3
+    var oscs = droneFreqs.map(function (f) {
+      var o = actx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      var g = actx.createGain();
+      g.gain.value = 0.16;
+      o.connect(g); g.connect(droneGain);
+      o.start();
+      return o;
+    });
+
+    var lfo = actx.createOscillator();
+    lfo.frequency.value = 0.06;
+    var lfoGain = actx.createGain();
+    lfoGain.gain.value = 0.2;
+    lfo.connect(lfoGain); lfoGain.connect(droneGain.gain);
+    lfo.start();
+
+    // A 小调五声音阶，偶发钟声/木鱼
+    var penta = [220, 261.63, 293.66, 329.63, 392.00];
+    function chime() {
+      if (!bgmNodes) return;
+      var base = penta[Math.floor(Math.random() * penta.length)];
+      if (Math.random() < 0.35) base *= 2; // 偶尔高八度
+      var t0 = actx.currentTime;
+      var o = actx.createOscillator();
+      var g = actx.createGain();
+      o.type = 'sine';
+      o.frequency.value = base;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.07, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.4);
+      var o2 = actx.createOscillator();
+      var g2 = actx.createGain();
+      o2.type = 'sine';
+      o2.frequency.value = base * 2.01;
+      g2.gain.setValueAtTime(0.0001, t0);
+      g2.gain.exponentialRampToValueAtTime(0.025, t0 + 0.02);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
+      o.connect(g); g.connect(master);
+      o2.connect(g2); g2.connect(master);
+      o.start(t0); o.stop(t0 + 3.5);
+      o2.start(t0); o2.stop(t0 + 2.5);
+      bgmTimer = setTimeout(chime, 4200 + Math.random() * 6000);
+    }
+    bgmTimer = setTimeout(chime, 2600);
+
+    bgmNodes = { master: master, oscs: oscs, lfo: lfo, lfoGain: lfoGain, droneGain: droneGain };
+  }
+
+  function bgmStop() {
+    if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+    if (!bgmNodes) return;
+    var n = bgmNodes; bgmNodes = null;
+    try {
+      var now = actx.currentTime;
+      n.master.gain.cancelScheduledValues(now);
+      n.master.gain.setValueAtTime(Math.max(n.master.gain.value, 0.0001), now);
+      n.master.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+    } catch (e) {}
+    setTimeout(function () {
+      try { n.oscs.forEach(function (o) { o.stop(); }); n.lfo.stop(); } catch (e) {}
+    }, 1500);
+  }
+
+  UI.setMusic = function (v) {
+    bgmOn = !!v;
+    try { localStorage.setItem('ss_music', bgmOn ? '1' : '0'); } catch (e) {}
+    var btn = $('btnMusic');
+    var pauseBtn = $('btnPauseMusic');
+    if (btn) btn.textContent = bgmOn ? '音乐' : '乐关';
+    if (pauseBtn) pauseBtn.textContent = bgmOn ? '音乐：开' : '音乐：关';
+    if (bgmOn) bgmStart(); else bgmStop();
+  };
+
+  UI.toggleMusic = function () { UI.setMusic(!bgmOn); };
+
   /* ---------------- basic UI ---------------- */
   UI.toast = function (text, cls) {
     var box = $('toasts');
@@ -571,6 +670,7 @@ window.SS = window.SS || {};
 
     $('btnStart').addEventListener('click', function () {
       ensureAudio();
+      bgmStart();
       game.start();
     });
     $('btnResume').addEventListener('click', function () { game.resume(); });
@@ -584,6 +684,8 @@ window.SS = window.SS || {};
     $('btnUpgrade').addEventListener('click', function () { game.openUpgrade(); });
     $('btnMenu').addEventListener('click', function () { game.togglePause(); });
     $('btnSound').addEventListener('click', function () { UI.toggleMute(); });
+    $('btnMusic').addEventListener('click', function () { UI.toggleMusic(); });
+    $('btnPauseMusic').addEventListener('click', function () { UI.toggleMusic(); });
 
     $('btnChat').addEventListener('click', function () {
       ensureAudio();
@@ -656,11 +758,12 @@ window.SS = window.SS || {};
 
     bindStick();
 
-    window.addEventListener('pointerdown', ensureAudio, { once: true });
-    window.addEventListener('keydown', ensureAudio, { once: true });
+    window.addEventListener('pointerdown', function () { ensureAudio(); bgmStart(); }, { once: true });
+    window.addEventListener('keydown', function () { ensureAudio(); bgmStart(); }, { once: true });
 
     UI.setMode('title');
     UI.setMuted(game.state.muted);
+    try { UI.setMusic(localStorage.getItem('ss_music') !== '0'); } catch (e) { UI.setMusic(true); }
     UI.chatReset();
   };
 
