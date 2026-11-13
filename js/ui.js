@@ -97,63 +97,63 @@ window.SS = window.SS || {};
 
     var master = actx.createGain();
     master.gain.setValueAtTime(0.0001, actx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.12, actx.currentTime + 4);
+    master.gain.exponentialRampToValueAtTime(0.10, actx.currentTime + 6);
     master.connect(actx.destination);
 
-    // 持续低音垫（轻微失谐 + 缓慢呼吸）
-    var droneGain = actx.createGain();
-    droneGain.gain.value = 0.5;
-    droneGain.connect(master);
-
-    var droneFreqs = [110, 110.4, 164.81]; // A2 + 微失谐 + E3
-    var oscs = droneFreqs.map(function (f) {
+    // 清风：高频极柔的持续气垫，带极慢起伏（仙气）
+    var air = actx.createGain();
+    air.gain.value = 0.05;
+    air.connect(master);
+    var airNotes = [783.99, 987.77, 1174.66]; // G5 B5 D6
+    var airOscs = airNotes.map(function (f) {
       var o = actx.createOscillator();
       o.type = 'sine';
       o.frequency.value = f;
       var g = actx.createGain();
-      g.gain.value = 0.16;
-      o.connect(g); g.connect(droneGain);
+      g.gain.value = 0.035;
+      o.connect(g); g.connect(air);
       o.start();
       return o;
     });
+    var airLfo = actx.createOscillator();
+    airLfo.frequency.value = 0.04;
+    var airLfoGain = actx.createGain();
+    airLfoGain.gain.value = 0.02;
+    airLfo.connect(airLfoGain); airLfoGain.connect(air.gain);
+    airLfo.start();
 
-    var lfo = actx.createOscillator();
-    lfo.frequency.value = 0.06;
-    var lfoGain = actx.createGain();
-    lfoGain.gain.value = 0.2;
-    lfo.connect(lfoGain); lfoGain.connect(droneGain.gain);
-    lfo.start();
-
-    // A 小调五声音阶，偶发钟声/木鱼
-    var penta = [220, 261.63, 293.66, 329.63, 392.00];
-    function chime() {
+    // 流水：连绵不绝、彼此重叠的极柔五声水滴（渺渺不断）
+    var scale = [392.00, 440.00, 523.25, 587.33, 659.25, 783.99]; // G4 A4 C5 D5 E5 G5
+    function drop() {
       if (!bgmNodes) return;
-      var base = penta[Math.floor(Math.random() * penta.length)];
-      if (Math.random() < 0.35) base *= 2; // 偶尔高八度
+      var f = scale[Math.floor(Math.random() * scale.length)];
+      if (Math.random() < 0.25) f *= 2; // 偶尔溅起更高水花
       var t0 = actx.currentTime;
       var o = actx.createOscillator();
       var g = actx.createGain();
       o.type = 'sine';
-      o.frequency.value = base;
+      o.frequency.setValueAtTime(f, t0);
+      o.frequency.exponentialRampToValueAtTime(f * 1.008, t0 + 1.2); // 极微滑音，似水波
       g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(0.07, t0 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.4);
+      g.gain.exponentialRampToValueAtTime(0.03, t0 + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.4);
+      o.connect(g); g.connect(master);
+      o.start(t0); o.stop(t0 + 1.5);
+      // 渺渺余音：高八度极弱长尾
       var o2 = actx.createOscillator();
       var g2 = actx.createGain();
       o2.type = 'sine';
-      o2.frequency.value = base * 2.01;
+      o2.frequency.value = f * 2.0;
       g2.gain.setValueAtTime(0.0001, t0);
-      g2.gain.exponentialRampToValueAtTime(0.025, t0 + 0.02);
-      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
-      o.connect(g); g.connect(master);
+      g2.gain.exponentialRampToValueAtTime(0.009, t0 + 0.2);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.6);
       o2.connect(g2); g2.connect(master);
-      o.start(t0); o.stop(t0 + 3.5);
-      o2.start(t0); o2.stop(t0 + 2.5);
-      bgmTimer = setTimeout(chime, 4200 + Math.random() * 6000);
+      o2.start(t0); o2.stop(t0 + 2.7);
+      bgmTimer = setTimeout(drop, 300 + Math.random() * 280); // 密集重叠 => 连续流水
     }
-    bgmTimer = setTimeout(chime, 2600);
+    bgmTimer = setTimeout(drop, 500);
 
-    bgmNodes = { master: master, oscs: oscs, lfo: lfo, lfoGain: lfoGain, droneGain: droneGain };
+    bgmNodes = { master: master, airOscs: airOscs, airLfo: airLfo, airLfoGain: airLfoGain, air: air };
   }
 
   function bgmStop() {
@@ -167,7 +167,7 @@ window.SS = window.SS || {};
       n.master.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
     } catch (e) {}
     setTimeout(function () {
-      try { n.oscs.forEach(function (o) { o.stop(); }); n.lfo.stop(); } catch (e) {}
+      try { n.airOscs.forEach(function (o) { o.stop(); }); n.airLfo.stop(); } catch (e) {}
     }, 1500);
   }
 
