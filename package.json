@@ -1,0 +1,12 @@
+{
+  "name": "shangshan-xiuxian",
+  "version": "1.0.0",
+  "private": true,
+  "description": "上山修仙 · 在线打坐",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
