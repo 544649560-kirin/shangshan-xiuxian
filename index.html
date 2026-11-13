@@ -92,6 +92,7 @@
       <button id="btnMenu" class="mini-btn">菜单</button>
       <button id="btnSound" class="mini-btn">音效</button>
       <button id="btnMusic" class="mini-btn">音乐</button>
+      <button id="btnPassportOpen3" class="mini-btn">道牒</button>
     </div>
 
     <div id="touch" class="hidden">
@@ -114,7 +115,8 @@
         <span><b>Esc</b> 菜单</span>
       </div>
       <button id="btnStart" class="pixel-btn primary">入 山</button>
-      <p class="tip">支持触屏 · 自动分殿联机 · 满座需候坐 · 进度自动保存在本机</p>
+      <button id="btnPassportOpen" class="link-btn">登记道牒 · 换个设备也能接着修</button>
+      <p class="tip">支持触屏 · 自动分殿联机 · 满座需候坐 · 登记后进度随身</p>
     </div>
   </div>
 
@@ -128,6 +130,7 @@
         <button id="btnPauseRename" class="pixel-btn">改道号</button>
         <button id="btnPauseSound" class="pixel-btn">音效：开</button>
         <button id="btnPauseMusic" class="pixel-btn">音乐：开</button>
+        <button id="btnPassportOpen2" class="pixel-btn">道牒 · 云存档</button>
         <button id="btnRestart" class="pixel-btn danger">重新开始</button>
       </div>
     </div>
@@ -163,6 +166,29 @@
     </div>
   </div>
 
+  <div id="passportPanel" class="hidden">
+    <h3>道 牒</h3>
+    <p class="muted">登记一次，之后在任何手机、电脑上用同一道号与口令进入，都是同一位道友，修为随身。</p>
+    <div id="passportLogged" class="hidden">
+      <p class="passport-name">已登记 · <b id="passportName"></b></p>
+      <p class="passport-state" id="passportStorage">修为已同步至云端</p>
+      <div class="row">
+        <button id="btnPassportLogout" class="pixel-btn">退出登记</button>
+        <button id="btnPassportClose" class="pixel-btn primary">继续修行</button>
+      </div>
+    </div>
+    <div id="passportForm">
+      <input id="passportNameInput" maxlength="10" autocomplete="off" placeholder="道号（2–10 字）">
+      <input id="passportPassInput" type="password" maxlength="40" autocomplete="off" placeholder="口令（至少 4 位）">
+      <p id="passportErr" class="passport-err hidden"></p>
+      <div class="row">
+        <button id="btnPassportSubmit" class="pixel-btn primary">登 记 / 登 录</button>
+        <button id="btnPassportCancel" class="pixel-btn">先不登记</button>
+      </div>
+      <p class="passport-note">同一道号 + 口令即可登录；若道号已存在且口令一致，自动视为登录。</p>
+    </div>
+  </div>
+
   <div id="renamePanel" class="hidden">
     <h3>改 道 号</h3>
     <p class="muted">道号会随你行走，同修都看得见。</p>
@@ -184,6 +210,7 @@
 <script src="js/net.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
+<script src="js/passport.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

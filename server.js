@@ -3,6 +3,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT) || 8000;
@@ -15,6 +16,89 @@ const TTL_MS = 12000;
 const PROTO = 3;
 const GRANT_MS = 6000;
 const MAX_REALM = 19; // 与前端 REALMS 长度保持一致（20 层）
+
+/* ---------------- 道牒登记 / 云存档 ----------------
+ * uid 由道号确定性派生，不依赖任何持久化文件：即使服务端档案全丢，
+ * 同一道号 + 口令登录回来仍是同一个 uid，身份不会漂移。
+ * token 用固定密钥签名，服务重启后依然有效。
+ */
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const ACCOUNT_FILE = path.join(DATA_DIR, 'accounts.json');
+const ACCOUNT_SECRET = 'shangshan-daoyuan-v1-2026'; // 固定签名密钥，勿随部署变动
+const MAX_SAVE_BYTES = 24000;
+const accounts = new Map(); // name -> { name, passHash, uid, save, updatedAt }
+let storageOK = false;
+let bootStamp = Date.now();
+
+function hashPass(pass) {
+  return crypto.createHash('sha256').update(ACCOUNT_SECRET + '|' + pass).digest('hex').slice(0, 32);
+}
+function nameKey(name) {
+  return String(name).trim().toLowerCase();
+}
+function uidFor(name) {
+  return 'd' + crypto.createHash('sha256').update('uid|' + nameKey(name)).digest('hex').slice(0, 18);
+}
+function tokenFor(uid) {
+  return crypto.createHash('sha256').update('token|' + ACCOUNT_SECRET + '|' + uid).digest('hex').slice(0, 32);
+}
+function verifyName(v) {
+  const s = String(v || '').replace(/[\u0000-\u001f<>]/g, '').trim();
+  return s.length >= 2 && s.length <= 10 ? s : null;
+}
+function verifyPass(v) {
+  const s = String(v || '');
+  return s.length >= 4 && s.length <= 40 ? s : null;
+}
+
+function loadAccounts() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    storageOK = true;
+  } catch (e) { storageOK = false; }
+  try {
+    const raw = JSON.parse(fs.readFileSync(ACCOUNT_FILE, 'utf8'));
+    if (raw && typeof raw === 'object') {
+      for (const [k, a] of Object.entries(raw)) {
+        if (a && typeof a.name === 'string' && typeof a.uid === 'string') accounts.set(k, a);
+      }
+    }
+  } catch (e) { /* 首次启动无档案 */ }
+  try {
+    const probe = path.join(DATA_DIR, '.writeprobe');
+    fs.writeFileSync(probe, String(bootStamp));
+    fs.unlinkSync(probe);
+    storageOK = true;
+  } catch (e) { storageOK = false; }
+}
+
+let savePending = null;
+function writeAccounts() {
+  if (!storageOK) return;
+  try {
+    const obj = {};
+    for (const [k, a] of accounts) obj[k] = a;
+    const tmp = ACCOUNT_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(obj));
+    fs.renameSync(tmp, ACCOUNT_FILE);
+  } catch (e) { /* 落盘失败不中断服务 */ }
+}
+function persistAccounts() {
+  if (!storageOK || savePending) return;
+  savePending = setTimeout(() => {
+    savePending = null;
+    writeAccounts();
+  }, 300);
+}
+// 进程退出前把待写档案强制落盘，避免防抖窗口内的数据丢失
+function flushAccounts() {
+  if (savePending) { clearTimeout(savePending); savePending = null; }
+  writeAccounts();
+}
+process.on('SIGTERM', flushAccounts);
+process.on('SIGINT', flushAccounts);
+process.on('beforeExit', flushAccounts);
+loadAccounts();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -58,13 +142,14 @@ function sendJson(res, code, body) {
   res.end(data);
 }
 
-function readBody(req) {
+function readBody(req, maxBytes) {
+  const limit = maxBytes || 8192;
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
     req.on('data', (chunk) => {
       size += chunk.length;
-      if (size > 8192) {
+      if (size > limit) {
         reject(new Error('too_large'));
         req.destroy();
         return;
@@ -337,8 +422,108 @@ const server = http.createServer(async (req, res) => {
       online: totalOnline(now),
       waiting: totalWaiting(),
       seats: SEAT_COUNT,
-      halls: halls.map((h) => ({ id: h.id, online: hallOnline(h.id, now), waiting: h.waiting.length }))
+      halls: halls.map((h) => ({ id: h.id, online: hallOnline(h.id, now), waiting: h.waiting.length })),
+      passport: { enabled: true, accounts: accounts.size, storage: storageOK, boot: bootStamp }
     });
+    return;
+  }
+
+  // 道牒：登记 / 登录 / 拉取存档 / 上传存档 / 退出
+  if (url.pathname === '/api/passport' && req.method === 'POST') {
+    let data;
+    try {
+      data = JSON.parse(await readBody(req, 32768));
+    } catch (e) {
+      sendJson(res, 400, { ok: false, error: 'bad_json' });
+      return;
+    }
+    const act = String(data.act || '');
+
+    if (act === 'register' || act === 'login') {
+      const name = verifyName(data.name);
+      const pass = verifyPass(data.pass);
+      if (!name || !pass) {
+        sendJson(res, 400, { ok: false, error: 'bad_input' });
+        return;
+      }
+      const key = nameKey(name);
+      const uid = uidFor(name);
+      const passHash = hashPass(pass);
+      const existing = accounts.get(key);
+
+      if (act === 'register') {
+        if (existing) {
+          // 同名已登记：口令正确则直接视为登录，避免重复占号
+          if (existing.passHash !== passHash) {
+            sendJson(res, 409, { ok: false, error: 'name_taken' });
+            return;
+          }
+        } else {
+          if (accounts.size >= 5000) {
+            sendJson(res, 503, { ok: false, error: 'account_full' });
+            return;
+          }
+          accounts.set(key, {
+            name, passHash, uid, save: null, updatedAt: Date.now()
+          });
+          persistAccounts();
+        }
+      } else if (!existing || existing.passHash !== passHash) {
+        sendJson(res, 401, { ok: false, error: 'bad_credentials' });
+        return;
+      }
+
+      const acc = accounts.get(key);
+      sendJson(res, 200, {
+        ok: true,
+        uid: acc.uid,
+        name: acc.name,
+        token: tokenFor(acc.uid),
+        save: acc.save || null,
+        updatedAt: acc.updatedAt || 0,
+        storage: storageOK
+      });
+      return;
+    }
+
+    const uid = String(data.uid || '');
+    const token = String(data.token || '');
+    if (!/^d[a-f0-9]{18}$/.test(uid) || token !== tokenFor(uid)) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    let acc = null;
+    for (const a of accounts.values()) { if (a.uid === uid) { acc = a; break; } }
+
+    if (act === 'pull') {
+      if (!acc) { sendJson(res, 404, { ok: false, error: 'no_account' }); return; }
+      sendJson(res, 200, { ok: true, name: acc.name, save: acc.save || null, updatedAt: acc.updatedAt || 0 });
+      return;
+    }
+    if (act === 'push') {
+      const save = data.save;
+      if (!save || typeof save !== 'object' || JSON.stringify(save).length > MAX_SAVE_BYTES) {
+        sendJson(res, 400, { ok: false, error: 'bad_save' });
+        return;
+      }
+      if (!acc) {
+        // 档案文件丢失时按 uid 重建，保证老用户仍能续上
+        acc = { name: String(data.name || '道友').slice(0, 10), passHash: '', uid, save: null, updatedAt: 0 };
+        accounts.set(nameKey(acc.name), acc);
+      }
+      // 别的设备在本机上次同步之后写过云端：拒绝覆盖，让本机决定是否取回
+      const base = Number(data.base) || 0;
+      if (acc.save && acc.updatedAt && base && base < acc.updatedAt) {
+        sendJson(res, 200, { ok: false, error: 'conflict', updatedAt: acc.updatedAt });
+        return;
+      }
+      acc.save = save;
+      acc.updatedAt = Date.now();
+      persistAccounts();
+      sendJson(res, 200, { ok: true, updatedAt: acc.updatedAt, storage: storageOK });
+      return;
+    }
+    sendJson(res, 400, { ok: false, error: 'bad_action' });
     return;
   }
 
