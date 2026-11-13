@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#eef7ff">
+<title>上山修仙 · 轻修一坐</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game" width="960" height="540"></canvas>
+  </div>
+
+  <div id="ui">
+    <header id="hud">
+      <div class="hud-row">
+        <button class="chip name" id="nameChip" title="点击改道号">道友</button>
+        <div class="chip realm" id="realmChip">凡人</div>
+        <div class="chip" id="timeChip">清晨</div>
+        <div class="bar-wrap">
+          <div class="bar" id="qiBar"></div>
+          <span class="bar-text" id="qiText">0 / 120</span>
+        </div>
+        <div class="chip" id="rateChip">5.0/s</div>
+        <div class="chip" id="stoneChip">灵石 0</div>
+        <div class="chip hidden" id="onlineChip">同修 1</div>
+        <div class="chip queue hidden" id="queueChip">候坐</div>
+        <div class="chip buff hidden" id="buffChip">灵气入体</div>
+      </div>
+      <div id="objective">于蒲团打坐，引气入体</div>
+    </header>
+
+    <div id="hint">WASD 走动 · E 交互</div>
+    <div id="toasts"></div>
+
+    <div id="dialog" class="panel hidden">
+      <div id="dialogText"></div>
+      <div class="dialog-arrow">E</div>
+    </div>
+
+    <div id="chat" class="hidden">
+      <div id="chatLog"><div class="chat-empty">同一殿的同修都能看到</div></div>
+      <form id="chatForm" autocomplete="off">
+        <input id="chatInput" maxlength="40" placeholder="与同修说句话…" autocomplete="off">
+        <button type="submit" id="chatSend">发送</button>
+      </form>
+    </div>
+
+    <div id="renamePanel" class="hidden">
+      <h3>改 道 号</h3>
+      <p class="muted">道号会随你行走，同修都看得见。</p>
+      <input id="renameInput" maxlength="10" autocomplete="off" placeholder="取个道号">
+      <div class="row">
+        <button id="btnRenameOk" class="pixel-btn primary">定 下</button>
+        <button id="btnRenameCancel" class="pixel-btn">再想想</button>
+      </div>
+    </div>
+
+    <div id="bookPanel" class="hidden">
+      <div class="book-card">
+        <div class="book-tag" id="bookTag">奇 遇</div>
+        <div class="book-seal">阅</div>
+        <h3 id="bookTitle">《道德经》</h3>
+        <p id="bookQuote" class="book-quote"></p>
+        <div class="book-gain">修为 <b id="bookGain">+0</b></div>
+        <button id="btnBookClose" class="pixel-btn primary">收 下</button>
+      </div>
+    </div>
+
+    <div id="shopPanel" class="hidden">
+      <div class="shop-card">
+        <div class="shop-head">
+          <div class="shop-seal">义</div>
+          <div class="shop-title">
+            <h3>义桥义起奔富</h3>
+            <p>山上小店 · 只收灵石</p>
+          </div>
+          <div class="shop-stones">灵石 <b id="shopStones">0</b></div>
+        </div>
+        <div id="shopList" class="shop-list"></div>
+        <div class="shop-foot">
+          <span class="muted">茶、笋与咖啡，都是给赶路的人备的。</span>
+          <button id="btnShopClose" class="pixel-btn">出 门</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="hiddenPanel" class="hidden">
+      <div class="hidden-card">
+        <div class="hidden-tag">隐 藏 剧 情</div>
+        <h3>红　光</h3>
+        <div id="hiddenText" class="hidden-text"></div>
+        <button id="btnHiddenClose" class="pixel-btn primary">退 后</button>
+      </div>
+    </div>
+
+    <div id="quickbar">
+      <button id="btnChat" class="mini-btn">聊天 <b>T</b><span id="chatBadge" class="badge hidden">0</span></button>
+      <button id="btnUpgrade" class="mini-btn">功法 <b>F</b></button>
+      <button id="btnMenu" class="mini-btn">菜单</button>
+      <button id="btnSound" class="mini-btn">音效</button>
+    </div>
+
+    <div id="touch" class="hidden">
+      <div id="stick"><div id="knob"></div></div>
+      <button id="btnE" class="touch-btn">E</button>
+    </div>
+  </div>
+
+  <div id="title" class="screen">
+    <div class="screen-inner title-inner">
+      <div class="seal">道</div>
+      <p class="subtitle">一 坐 下 ， 山 就 开 始 了</p>
+      <p class="lead">你是个普通人。上山，寻一处蒲团，坐下。<br>打坐、拾灵草、听老道闲话，慢慢把自己修成另一副样子。</p>
+      <div class="keys">
+        <span><b>WASD</b> 行走</span>
+        <span><b>E</b> 打坐 / 交互</span>
+        <span><b>F</b> 功法</span>
+        <span><b>T</b> 聊天</span>
+        <span><b>N</b> 改道号</span>
+        <span><b>Esc</b> 菜单</span>
+      </div>
+      <button id="btnStart" class="pixel-btn primary">入 山</button>
+      <p class="tip">支持触屏 · 自动分殿联机 · 满座需候坐 · 进度自动保存在本机</p>
+    </div>
+  </div>
+
+  <div id="pause" class="screen hidden">
+    <div class="screen-inner">
+      <h2>暂 歇</h2>
+      <p class="muted">山中无别事，只有一口气。</p>
+      <div class="stack">
+        <button id="btnResume" class="pixel-btn primary">继续打坐</button>
+        <button id="btnPauseUpgrade" class="pixel-btn">修习功法</button>
+        <button id="btnPauseRename" class="pixel-btn">改道号</button>
+        <button id="btnPauseSound" class="pixel-btn">音效：开</button>
+        <button id="btnRestart" class="pixel-btn danger">重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="upgrade" class="screen hidden">
+    <div class="screen-inner wide">
+      <h2>功 法</h2>
+      <p class="muted">灵石 <b id="upStone">0</b> · 打坐效率 <b id="upRate">5.0/s</b></p>
+      <div id="upList"></div>
+      <button id="btnUpClose" class="pixel-btn">合上册子</button>
+    </div>
+  </div>
+
+  <div id="offline" class="screen hidden">
+    <div class="screen-inner">
+      <h2>闭 关 归 来</h2>
+      <p class="muted">你离开了 <b id="offTime">—</b>，山中的气仍在慢慢走。</p>
+      <p class="gain">修为 <b id="offGain">+0</b></p>
+      <button id="btnOffOk" class="pixel-btn primary">入 山</button>
+    </div>
+  </div>
+
+  <div id="ending" class="screen hidden">
+    <div class="screen-inner">
+      <h2>化 神</h2>
+      <div id="endingText" class="ending-text"></div>
+      <div id="endStats" class="stats"></div>
+      <div class="row">
+        <button id="btnEndContinue" class="pixel-btn primary">继续修行</button>
+        <button id="btnEndRestart" class="pixel-btn">重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="fade"></div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/art.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/intro.js"></script>
+<script src="js/player.js"></script>
+<script src="js/net.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

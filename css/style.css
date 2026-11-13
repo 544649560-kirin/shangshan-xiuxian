@@ -1,0 +1,474 @@
+:root{
+  --ink:#2a2826;
+  --navy:#3d3a36;
+  --slate:#5a5550;
+  --pine:#6a8a6a;
+  --moss:#9ab090;
+  --leaf:#8aa888;
+  --mist:#d8d2c8;
+  --paper:#f4efe6;
+  --paperL:#faf7f0;
+  --sand:#d8c8a8;
+  --ochre:#b89060;
+  --brown:#9a7357;
+  --cinnabar:#a84038;
+  --gold:#c8a850;
+  --sky:#a8b0b8;
+  --card:rgba(244,239,230,.94);
+  --hairline:rgba(42,40,38,.1);
+  --shadow:0 8px 24px rgba(42,40,38,.12);
+  --shadow-sm:0 4px 12px rgba(42,40,38,.1);
+  --r:14px;
+  --r-sm:10px;
+  --r-pill:999px;
+}
+
+*{box-sizing:border-box}
+html,body{
+  height:100%;margin:0;overflow:hidden;color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;
+  background:#e8e2d4;
+}
+button{font-family:inherit}
+
+#app{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(ellipse at 50% 30%, #faf7f0 0%, #f0ebe0 48%, #e0dcd0 100%);
+}
+
+#stage{position:relative;line-height:0;z-index:1}
+#game{
+  display:block;border-radius:16px;
+  box-shadow:0 2px 0 rgba(250,247,240,.9) inset,0 18px 46px rgba(42,40,38,.2),0 0 0 1px rgba(42,40,38,.06);
+}
+#ui{position:fixed;inset:0;z-index:2;pointer-events:none;font-size:12px;transition:opacity .25s linear}
+#ui.ui-hidden{opacity:0;pointer-events:none;visibility:hidden}
+
+/* ---------- HUD ---------- */
+#hud{
+  position:absolute;left:14px;top:14px;padding:9px 12px 8px;
+  background:var(--card);
+  border:1px solid var(--hairline);
+  border-radius:var(--r);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  max-width:calc(100vw - 28px);
+}
+.hud-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chip{
+  font-size:11px;line-height:1;padding:5px 9px;letter-spacing:.4px;
+  background:#f0ebe0;border:1px solid var(--hairline);
+  border-radius:var(--r-pill);
+  color:var(--slate);white-space:nowrap;
+}
+.chip.realm{
+  background:rgba(168,64,56,.1);border-color:rgba(168,64,56,.3);color:#8a3028;
+  letter-spacing:2px;padding-right:6px;font-size:12px;font-weight:600;
+}
+.chip.buff{
+  border-color:rgba(200,168,80,.6);color:#8a7030;background:rgba(200,168,80,.16);
+  animation:buffPulse 1.4s ease-in-out infinite;
+}
+.chip.queue{
+  border-color:rgba(90,85,80,.4);color:#4a4540;background:rgba(90,85,80,.12);
+  animation:buffPulse 1.8s ease-in-out infinite;
+}
+.chip.name{
+  pointer-events:auto;cursor:pointer;font-family:inherit;
+  color:#8a3028;background:rgba(168,64,56,.07);border-color:rgba(168,64,56,.25);
+  max-width:96px;overflow:hidden;text-overflow:ellipsis;
+}
+.chip.name:hover{background:rgba(168,64,56,.14)}
+.bar-wrap{
+  position:relative;width:172px;height:14px;flex:0 1 172px;
+  background:#e0dcd0;border:1px solid var(--hairline);border-radius:var(--r-pill);
+  overflow:hidden;
+}
+.bar{
+  height:100%;width:0%;border-radius:var(--r-pill);
+  background:linear-gradient(90deg,#c8a850,#a88840);
+  transition:width .18s linear;
+}
+.bar-text{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:9px;letter-spacing:.4px;color:var(--ink);line-height:1;
+  padding:1px 6px;background:rgba(244,239,230,.78);border-radius:var(--r-pill);
+  font-weight:600;
+}
+#objective{
+  margin-top:7px;font-size:11px;color:var(--slate);letter-spacing:.4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:330px;
+}
+.hidden{display:none !important}
+
+/* ---------- hint / toast / dialog ---------- */
+#hint{
+  position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+  padding:7px 14px;font-size:12px;letter-spacing:.4px;color:var(--ink);
+  background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-pill);
+  box-shadow:var(--shadow-sm);
+  white-space:nowrap;pointer-events:none;
+}
+#toasts{
+  position:absolute;left:50%;top:86px;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  width:max-content;max-width:86vw;pointer-events:none;
+}
+.toast{
+  padding:8px 15px;font-size:12px;letter-spacing:.4px;color:var(--ink);
+  background:var(--card);border-radius:var(--r-pill);
+  border-left:4px solid var(--gold);
+  box-shadow:var(--shadow-sm);
+  animation:toastIn .18s ease-out both;
+}
+.toast.out{opacity:0;transition:opacity .35s}
+.toast.buff{border-left-color:var(--cinnabar)}
+#dialog{
+  position:absolute;left:50%;bottom:46px;transform:translateX(-50%);
+  width:min(440px,calc(100vw - 40px));padding:14px 18px 18px;
+  background:var(--card);border:1px solid var(--hairline);border-radius:18px;
+  box-shadow:var(--shadow);
+  font-size:13px;line-height:1.75;color:var(--ink);pointer-events:auto;
+}
+#dialogText{min-height:2.6em;letter-spacing:.5px}
+.dialog-arrow{
+  position:absolute;right:14px;bottom:8px;font-size:10px;color:var(--cinnabar);font-weight:600;
+  animation:blink 1.2s ease-in-out infinite;
+}
+
+/* ---------- quick bar ---------- */
+#quickbar{position:absolute;right:14px;top:14px;display:flex;gap:6px;pointer-events:auto}
+.mini-btn{
+  font-size:11px;letter-spacing:.4px;padding:6px 11px;cursor:pointer;
+  background:var(--card);color:var(--slate);
+  border:1px solid var(--hairline);border-radius:var(--r-pill);
+  box-shadow:var(--shadow-sm);
+  transition:color .12s,background .12s;
+}
+.mini-btn b{font-size:9px;opacity:.5;margin-left:2px}
+.mini-btn:hover{color:#8a3028;background:#f6efe8}
+.badge{
+  display:inline-block;min-width:14px;height:14px;margin-left:4px;
+  font-size:9px;line-height:14px;text-align:center;color:#fff;
+  background:var(--cinnabar);border-radius:var(--r-pill);padding:0 4px;
+  vertical-align:1px;
+}
+
+/* ---------- chat ---------- */
+#chat{
+  position:absolute;left:14px;bottom:58px;
+  width:min(320px,calc(100vw - 28px));
+  display:flex;flex-direction:column;overflow:hidden;
+  background:var(--card);border:1px solid var(--hairline);border-radius:14px;
+  box-shadow:var(--shadow);pointer-events:auto;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+#chatLog{
+  max-height:158px;overflow-y:auto;padding:10px 12px 6px;
+  display:flex;flex-direction:column;gap:4px;
+  font-size:12px;line-height:1.55;letter-spacing:.2px;
+}
+.chat-msg{color:var(--ink);word-break:break-word}
+.chat-msg b{font-size:11px;font-weight:600;color:var(--slate);margin-right:5px}
+.chat-msg.self b{color:var(--cinnabar)}
+.chat-empty{font-size:11px;color:#a8a29a;text-align:center;padding:6px 0}
+#chatForm{
+  display:flex;gap:6px;padding:8px 10px 10px;
+  border-top:1px solid var(--hairline);
+}
+#chatInput{
+  flex:1;min-width:0;font-family:inherit;font-size:12px;color:var(--ink);
+  padding:7px 12px;border:1px solid var(--hairline);border-radius:var(--r-pill);
+  background:#faf7f0;outline:none;
+}
+#chatInput::placeholder{color:#a8a29a}
+#chatInput:focus{border-color:rgba(168,64,56,.45)}
+#chatSend{
+  flex:0 0 auto;font-family:inherit;font-size:12px;letter-spacing:1px;
+  padding:7px 14px;border:none;border-radius:var(--r-pill);
+  color:#fff;background:var(--cinnabar);cursor:pointer;
+  box-shadow:0 4px 12px rgba(168,64,56,.28);
+}
+#chatSend:active{transform:scale(.96)}
+body.touch #chat{bottom:150px}
+
+/* ---------- rename ---------- */
+#renamePanel{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(320px,calc(100vw - 40px));padding:20px 20px 18px;
+  text-align:center;pointer-events:auto;z-index:5;
+  background:var(--card);border:1px solid var(--hairline);border-radius:20px;
+  box-shadow:0 24px 60px rgba(42,40,38,.2);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+#renamePanel h3{
+  margin:0 0 6px;font-family:"Songti SC","STSong",serif;
+  font-size:16px;letter-spacing:4px;color:var(--ink);
+}
+#renamePanel .muted{margin:0 0 14px;font-size:11px;color:var(--slate)}
+#renameInput{
+  width:100%;font-family:inherit;font-size:14px;text-align:center;color:var(--ink);
+  padding:10px 14px;border:1px solid var(--hairline);border-radius:var(--r-sm);
+  background:#faf7f0;outline:none;letter-spacing:1px;
+}
+#renameInput:focus{border-color:rgba(168,64,56,.45)}
+#renamePanel .row{margin-top:14px}
+
+/* ---------- 奇遇古书 ---------- */
+#bookPanel{
+  position:absolute;inset:0;z-index:6;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(232,226,212,.55);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  pointer-events:auto;
+}
+.book-card{
+  position:relative;width:min(300px,calc(100vw - 48px));
+  padding:26px 24px 22px;text-align:center;
+  background:
+    repeating-linear-gradient(90deg,rgba(184,144,96,.05) 0 1px,transparent 1px 9px),
+    #f7f2e6;
+  border:1px solid rgba(168,64,56,.28);
+  border-radius:6px;
+  box-shadow:0 24px 60px rgba(42,40,38,.28),0 0 0 4px rgba(247,242,230,.6) inset;
+  animation:bookIn .28s ease-out both;
+}
+.book-card::before{
+  content:'';position:absolute;inset:7px;border:1px solid rgba(168,64,56,.18);
+  border-radius:3px;pointer-events:none;
+}
+.book-tag{
+  font-size:10px;letter-spacing:4px;color:#a8a29a;margin-bottom:10px;
+}
+.book-seal{
+  position:absolute;top:16px;right:16px;width:26px;height:26px;
+  font-family:"Songti SC","STSong",serif;font-size:15px;line-height:24px;
+  color:var(--cinnabar);border:1.5px solid rgba(168,64,56,.5);
+  border-radius:6px;transform:rotate(7deg);background:rgba(168,64,56,.06);
+}
+.book-card h3{
+  margin:0 0 12px;font-family:"Songti SC","STSong",serif;
+  font-size:19px;letter-spacing:3px;color:var(--ink);
+}
+.book-quote{
+  margin:0 0 16px;padding:0 6px;
+  font-family:"Songti SC","STSong",serif;font-size:14px;line-height:2;
+  letter-spacing:1px;color:#4a4540;
+}
+.book-gain{font-size:12px;letter-spacing:2px;color:var(--slate);margin-bottom:18px}
+.book-gain b{font-size:20px;color:var(--cinnabar);letter-spacing:1px}
+#bookPanel.rare .book-card{box-shadow:0 24px 60px rgba(42,40,38,.3),0 0 0 4px rgba(200,168,80,.22) inset}
+#bookPanel.rare .book-tag{color:#a88840}
+#bookPanel.rare h3{color:#8a5a2a}
+@keyframes bookIn{
+  from{opacity:0;transform:translateY(10px) scale(.96)}
+  to{opacity:1;transform:none}
+}
+
+/* ---------- touch ---------- */
+#touch{display:none}
+body.touch #touch{display:block}
+#stick{
+  position:absolute;left:20px;bottom:22px;width:104px;height:104px;border-radius:50%;
+  background:rgba(244,239,230,.45);border:2px solid rgba(244,239,230,.9);
+  box-shadow:var(--shadow-sm);
+  pointer-events:auto;touch-action:none;
+}
+#knob{
+  position:absolute;left:50%;top:50%;width:44px;height:44px;border-radius:50%;
+  background:rgba(244,239,230,.92);border:2px solid rgba(168,64,56,.5);
+  box-shadow:0 2px 8px rgba(42,40,38,.18);
+  transform:translate(-50%,-50%);
+}
+#btnE{
+  position:absolute;right:24px;bottom:32px;width:66px;height:66px;border-radius:50%;
+  background:var(--cinnabar);border:none;
+  color:#fff;font-size:20px;letter-spacing:1px;font-weight:600;
+  pointer-events:auto;touch-action:none;
+  box-shadow:0 6px 18px rgba(168,64,56,.42);
+}
+#btnE:active{transform:scale(.94)}
+body.touch #hint{bottom:142px}
+body.touch #dialog{bottom:150px}
+body.touch #toasts{top:92px}
+
+/* ---------- screens ---------- */
+.screen{
+  position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
+  padding:18px;overflow-y:auto;
+  background:rgba(232,226,212,.7);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.screen-inner{
+  position:relative;width:min(460px,100%);padding:30px 28px 26px;
+  background:#faf7f0;color:var(--ink);text-align:center;
+  border:1px solid var(--hairline);border-radius:24px;
+  box-shadow:0 24px 60px rgba(42,40,38,.18);
+}
+.screen-inner.wide{width:min(520px,100%)}
+.screen h1{
+  font-family:"Songti SC","STSong","SimSun",serif;
+  font-size:40px;font-weight:600;letter-spacing:10px;text-indent:10px;
+  margin:10px 0 4px;color:var(--ink);
+}
+.screen h2{
+  font-family:"Songti SC","STSong","SimSun",serif;
+  font-size:24px;font-weight:600;letter-spacing:8px;text-indent:8px;
+  margin:2px 0 12px;
+}
+.subtitle{font-size:11px;letter-spacing:4px;color:var(--ochre);margin:0 0 4px}
+.lead{font-size:13px;line-height:1.95;color:var(--slate);margin:16px 0 4px}
+.muted{font-size:12px;color:var(--slate);margin:6px 0 14px}
+.tip{font-size:10px;color:var(--slate);opacity:.75;margin:16px 0 0;letter-spacing:.4px}
+.seal{
+  position:absolute;top:20px;right:22px;width:36px;height:36px;
+  border-radius:12px;background:rgba(168,64,56,.1);
+  border:1.5px solid rgba(168,64,56,.45);color:var(--cinnabar);
+  font-family:"Songti SC",serif;font-size:21px;line-height:33px;
+  transform:rotate(6deg);
+}
+.keys{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:8px 14px;
+  font-size:11px;color:var(--slate);margin:16px 0 22px;
+}
+.keys b{
+  display:inline-block;background:rgba(168,64,56,.1);color:#8a3028;
+  border-radius:6px;font-size:10px;padding:2px 7px;margin-right:3px;letter-spacing:.5px;
+}
+.stack{display:flex;flex-direction:column;gap:10px;align-items:stretch;margin-top:6px}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+.pixel-btn{
+  display:inline-block;cursor:pointer;
+  font-size:13px;letter-spacing:1.5px;padding:11px 24px;
+  background:#f0ebe0;color:var(--ink);
+  border:1px solid var(--hairline);border-radius:var(--r-pill);
+  transition:transform .08s ease,background .12s,box-shadow .12s;
+}
+.pixel-btn:hover{background:#e8e2d4;transform:translateY(-1px)}
+.pixel-btn:active{transform:translateY(0)}
+.pixel-btn.primary{
+  background:var(--cinnabar);color:#fff;border-color:transparent;
+  box-shadow:0 8px 20px rgba(168,64,56,.34);
+}
+.pixel-btn.primary:hover{background:#923830}
+.pixel-btn.danger{background:transparent;color:var(--cinnabar);border-color:rgba(168,64,56,.4)}
+.pixel-btn.danger:hover{background:rgba(168,64,56,.08)}
+
+/* ---------- upgrades ---------- */
+#upList{margin:6px 0 16px;text-align:left}
+.up-row{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:11px 12px;margin:8px 0;
+  border:1px solid var(--hairline);border-radius:var(--r-sm);background:#f6f2ea;
+}
+.up-info b{font-size:13px;letter-spacing:.6px}
+.up-lv{font-size:10px;color:var(--slate);margin-left:6px;letter-spacing:.4px}
+.up-desc{font-size:11px;color:var(--slate);margin-top:4px;line-height:1.45}
+.up-row .pixel-btn{
+  font-size:11px;letter-spacing:.6px;padding:8px 12px;border-radius:var(--r-pill);
+  box-shadow:none;white-space:nowrap;min-width:104px;text-align:center;
+}
+.up-row .pixel-btn:hover{transform:none;background:#e8e2d4}
+.up-row .pixel-btn:disabled{
+  background:#e0dcd0;color:#a8a29a;border-color:transparent;
+  cursor:not-allowed;
+}
+
+/* ---------- ending / offline ---------- */
+.ending-text{
+  font-family:"Songti SC","STSong",serif;
+  font-size:16px;line-height:2.2;color:var(--slate);margin:16px 0 18px;letter-spacing:1px;
+}
+.stats{
+  font-size:11px;line-height:1.9;color:var(--slate);
+  border-top:1px dashed rgba(154,115,87,.3);padding-top:12px;margin-bottom:16px;letter-spacing:.4px;
+}
+.gain{font-size:17px;color:var(--cinnabar);letter-spacing:2px;margin:6px 0 22px}
+.gain b{font-size:22px}
+
+#fade{
+  position:fixed;inset:0;z-index:60;background:#e8e2d4;opacity:0;
+  pointer-events:none;transition:opacity .4s linear;
+}
+#fade.on{opacity:1}
+
+@keyframes blink{0%{opacity:1}50%{opacity:.2}100%{opacity:1}}
+@keyframes buffPulse{0%{opacity:1}50%{opacity:.6}100%{opacity:1}}
+@keyframes toastIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+@media (max-width:620px){
+  #hud{padding:7px 9px;left:8px;top:8px;max-width:calc(100vw - 76px)}
+  #rateChip{display:none}
+  #quickbar{right:8px;top:84px;gap:5px;flex-direction:column;align-items:flex-end}
+  .mini-btn{padding:5px 8px;font-size:10px}
+  .bar-wrap{width:118px;flex-basis:118px}
+  #objective{font-size:10px;max-width:240px}
+  .screen h1{font-size:30px;letter-spacing:6px;text-indent:6px}
+  .screen-inner{padding:22px 16px 20px;border-radius:20px}
+  .lead{font-size:12px}
+  .keys{font-size:10px}
+  #dialog{font-size:12px;bottom:38px}
+  body.touch #dialog{bottom:150px}
+}
+@media (prefers-reduced-motion:reduce){
+  .toast,.chip.buff,.chip.queue,.dialog-arrow{animation:none}
+}
+
+/* ---------------- 山上小店 · 义桥义起奔富 ---------------- */
+#shopPanel{
+  position:fixed;inset:0;z-index:44;display:flex;align-items:center;justify-content:center;
+  padding:16px;background:rgba(28,24,18,.42);backdrop-filter:blur(2px);pointer-events:auto;
+}
+#shopPanel.hidden{display:none}
+.shop-card{
+  width:min(92vw,480px);max-height:86vh;overflow:auto;padding:18px 20px 14px;border-radius:14px;
+  background:linear-gradient(180deg,#f8f1e1,#ece1c9);
+  border:1px solid rgba(90,74,52,.35);
+  box-shadow:0 18px 50px rgba(30,24,16,.35),inset 0 0 0 1px rgba(255,252,244,.6);
+}
+.shop-head{display:flex;align-items:center;gap:12px;padding-bottom:10px;border-bottom:1px dashed rgba(90,74,52,.3)}
+.shop-seal{
+  width:38px;height:38px;flex:0 0 38px;border-radius:8px;display:grid;place-items:center;
+  background:#a84038;color:#f8f0e0;font-size:20px;font-weight:700;
+  box-shadow:inset 0 0 0 2px rgba(255,240,220,.35);
+}
+.shop-title h3{margin:0;font-size:18px;letter-spacing:2px;color:#2a2620}
+.shop-title p{margin:2px 0 0;font-size:11px;color:#7a6c58}
+.shop-stones{margin-left:auto;font-size:12px;color:#5a4a34;white-space:nowrap}
+.shop-stones b{font-size:16px;color:#a84038}
+.shop-list{margin:10px 0;display:flex;flex-direction:column;gap:8px}
+.shop-row{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
+  background:rgba(255,252,244,.72);border:1px solid rgba(140,118,86,.22);
+}
+.shop-info{flex:1;min-width:0}
+.shop-info b{font-size:14px;color:#2e2a22}
+.shop-tag{margin-left:6px;font-size:10px;padding:1px 6px;border-radius:999px;background:#e6d8bc;color:#7a6446}
+.shop-desc{margin-top:3px;font-size:11px;color:#7a6c58}
+.shop-row .pixel-btn{min-width:86px;font-size:12px;padding:7px 10px}
+.shop-foot{display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px dashed rgba(90,74,52,.3)}
+.shop-foot .muted{flex:1;font-size:11px;color:#8a7a62}
+.shop-row .pixel-btn.is-off{opacity:.5;filter:grayscale(.45)}
+
+/* ---------------- 隐藏剧情 · 红光 ---------------- */
+#hiddenPanel{
+  position:fixed;inset:0;z-index:46;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:radial-gradient(circle at 50% 40%,rgba(60,10,10,.55),rgba(8,6,6,.84));pointer-events:auto;
+}
+#hiddenPanel.hidden{display:none}
+.hidden-card{
+  width:min(90vw,420px);padding:22px 24px;border-radius:12px;text-align:center;color:#e8d8c8;
+  background:linear-gradient(180deg,#241a18,#160f0e);
+  border:1px solid rgba(200,70,60,.4);
+  box-shadow:0 0 60px rgba(200,50,40,.35),inset 0 0 40px rgba(200,50,40,.06);
+}
+.hidden-tag{font-size:10px;letter-spacing:3px;color:#c86050;margin-bottom:8px}
+.hidden-card h3{margin:0 0 14px;font-size:24px;letter-spacing:8px;color:#e86a5a;text-shadow:0 0 18px rgba(230,70,55,.6)}
+.hidden-text p{margin:9px 0;font-size:13px;line-height:1.9;color:#d8c8b8}
+.hidden-text p:last-child{color:#f0b0a0}
+.hidden-card .pixel-btn{margin-top:16px}
